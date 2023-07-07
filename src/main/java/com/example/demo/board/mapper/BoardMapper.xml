@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper 
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.example.demo.board.mapper.BoardMapper">
+
+	<!-- Main -->
+	<select id="boardList"
+		resultType="com.example.demo.board.domain.BoardVO">
+		SELECT
+		*
+		FROM post
+	</select>
+	<select id="boardMyList"
+		resultType="com.example.demo.board.domain.BoardVO">
+		SELECT * 
+		FROM post
+		JOIN user_post
+		ON
+		user_post.post_id=post.post_id
+		WHERE user_post.user_id=#{user_id}
+		AND
+		user_post.delete_flag=1
+	</select>
+
+
+	<insert id="addMyList"
+		parameterType="com.example.demo.board.domain.AddVO">
+		INSERT INTO
+		user_post(user_id, post_id, delete_flag)
+		VALUES(#{user_id}, #{post_id}, 1);
+	</insert>
+
+	<select id="boardRecList"
+		resultType="com.example.demo.board.domain.BoardVO">
+		SELECT post.post_id, image_url, title, apply_start,
+		apply_end, event_start,
+		event_end
+		FROM post, (SELECT DISTINCT post_id as
+		pi
+		FROM post_tag, (SELECT tag_id AS ti FROM user_tag WHERE
+		delete_flag=1 and
+		user_id = #{user_id}) as a
+		WHERE post_tag.tag_id = ti)
+		as b
+		WHERE post.post_id = pi;
+	</select>
+
+	<select id="boardPost" parameterType="int"
+		resultType="com.example.demo.board.domain.BoardVO">
+		SELECT
+		*
+		FROM post where post_id= #{post_id}
+	</select>
+
+	<!-- New!! -->
+
+	<select id="tagAdd" parameterType="HashMap">
+	      INSERT INTO user_tag (user_id, tag_id, delete_flag)
+	      VALUES (#{user_id},(SELECT tag_id FROM tag WHERE tag_name = #{add_tag}),1)
+	      ON DUPLICATE KEY UPDATE
+	      user_id=#{user_id},
+	      tag_id=(SELECT tag_id FROM tag WHERE tag_name = #{add_tag}),
+	      delete_flag=1;
+	</select>
+
+
+	<select id="scheduleList_past"
+		resultType="com.example.demo.board.domain.ScheduleVO">
+		SELECT
+		post_id, image_url, title, apply_start, apply_end,
+		event_start, event_end
+		FROM post where DATE(event_end) >=
+		DATE_SUB(NOW(),INTERVAL 3 YEAR)
+		and date(now()) >= date(event_end)
+		order by event_end DESC
+	</select>
+
+	<select id="scheduleList_current"
+		resultType="com.example.demo.board.domain.ScheduleVO">
+		SELECT
+		post_id, image_url, title, apply_start, apply_end,
+		event_start, event_end
+		FROM post order by if(DATE(apply_end) >=
+		DATE(NOW()), apply_end,
+		event_end) ASC
+	</select>
+
+	<insert id="postInsert"
+		parameterType="com.example.demo.board.domain.BoardVO"
+		useGeneratedKeys="true" keyProperty="post_id">
+		INSERT INTO
+		post (title, user_id,image_url, subject, apply_start, apply_end, event_start,
+		event_end, description, writer, phone, email, url, reg_date)
+		VALUES(#{title}, #{user_id},#{image_url},#{subject}, #{apply_start},
+		#{apply_end}, #{event_start}, #{event_end},#{description},#{writer},
+		#{phone}, #{email}, #{url}, now())
+	</insert>
+
+	<insert id="fileInsert"
+		parameterType="com.example.demo.board.domain.FileVO">
+		INSERT INTO
+		FILES (FNO, post_id, FILENAME, FILEORINAME, FILEURL)
+		VALUES (#{fno},#{post_id},#{fileName},#{fileOriName},#{fileUrl})
+	</insert>
+
+	<select id="fileDetail" parameterType="int"
+		resultType="com.example.demo.board.domain.FileVO">
+		SELECT
+		*
+		FROM FILES
+		WHERE
+		post_id = #{post_id}
+	</select>
+
+	<!-- New!! -->
+	<select id="userId" parameterType="String" resultType="int">
+		SELECT
+		user_id
+		FROM user
+		WHERE uuid=#{UUID}
+	</select>
+
+	<!-- Tag // New!! -->
+	<select id="tagNamePostNumList" parameterType="int" resultType="com.example.demo.board.domain.TagVO">
+      SELECT tag_name, count(*) as relatedPostNum
+        FROM post_tag as pt, (SELECT
+      t.tag_id, t.tag_name
+      FROM tag AS t, (SELECT tag_id
+      FROM user AS u, user_tag AS ut
+      WHERE u.user_id = ut.user_id AND u.user_id=#{user_id} and
+      ut.delete_flag != 0) AS m
+      WHERE t.tag_id = m.tag_id) as m2
+        WHERE pt.delete_flag = 1 AND m2.tag_id = pt.tag_id
+        GROUP BY pt.tag_id
+   </select>
+
+
+	<!-- New Delete -->
+	<delete id="tagNameDelete" parameterType="HashMap">
+		UPDATE user_tag SET
+		delete_flag=0
+		WHERE user_id = #{user_id} and tag_id =
+		(SELECT tag_id
+		FROM tag WHERE tag_name=#{tag_name});
+	</delete>
+
+	<!-- Deatil post tags list -->
+	<select id="postTag" parameterType="int" resultType="String">
+		SELECT
+		tag_name
+		FROM tag AS t, (SELECT tag_id FROM post AS p, post_tag AS pt
+		WHERE p.post_id = pt.post_id AND p.post_id=#{post_id} and
+		pt.delete_flag != 0) AS m
+		WHERE t.tag_id = m.tag_id
+	</select>
+
+
+	<select id="tagCount" resultType="int">
+		SELECT
+		COUNT(*)
+		FROM tag
+	</select>
+
+	<select id="updatePost" parameterType="int"
+		resultType="com.example.demo.board.domain.BoardVO">
+		select * 
+		from post where post_id = #{post_id}
+	</select>
+	
+	<update id="updatePostImpl" parameterType ="com.example.demo.board.domain.BoardVO">
+		update post
+		set title = #{title},
+			writer = #{writer},
+			phone = #{phone},
+			email = #{email}, 
+			subject = #{subject},
+			apply_start = #{apply_start},
+			apply_end = #{apply_end},
+			event_start = #{event_start},
+			event_end = #{event_end},
+			description = #{description},
+			url = #{url},
+			update_date = now()
+		WHERE post_id = #{post_id}
+	</update>
+	
+	<delete id="deletePost" parameterType= "int" >
+		delete from post
+		where post_id = #{post_id}
+	</delete>
+	
+	<update id="fileUpdate" parameterType="com.example.demo.board.domain.FileVO">
+		update file
+		set filename = #{fileName},
+			fileOriName = #{fileOriName},
+			fileUrl = #{fileUrl}
+		where post_id = #{post_id}
+	</update>
+	
+</mapper>
